@@ -19,6 +19,7 @@ public class Main {
         ServerSocket serverSocket = new ServerSocket(12345);
         while (true) {
             Socket socket = serverSocket.accept();
+            System.out.println("accept connect [" + socket.getRemoteSocketAddress() + "]");
             executor.execute(new ProxyTask(socket));
         }
     }
