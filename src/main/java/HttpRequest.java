@@ -8,6 +8,7 @@ public class HttpRequest {
     private String version;
     private Map<String,String> header;
     private String body;
+    private byte[] originBody;
     private String serverHost; // 目标服务器的host
     private int serverPort; // 目标服务器的port
 

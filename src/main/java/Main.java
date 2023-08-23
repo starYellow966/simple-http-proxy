@@ -20,7 +20,7 @@ public class Main {
         while (true) {
             Socket socket = serverSocket.accept();
             System.out.println("accept connect [" + socket.getRemoteSocketAddress() + "]");
-            executor.execute(new ProxyTask(socket));
+            executor.execute(new SyncProxyRequestHandler(socket));
         }
     }
 }
