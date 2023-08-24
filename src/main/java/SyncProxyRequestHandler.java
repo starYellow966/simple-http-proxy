@@ -72,13 +72,25 @@ public class SyncProxyRequestHandler implements Runnable{
 
 
             // step4 监听两个socket，进行数据转发
+            int idleCount = 0; // 空转次数
             while (true) {
+                boolean isIdle = true;
                 // 先判断有没有数据，再进行读。避免阻塞
                 if (serverInput.available() > 0) {
                     write(clientOutput, read(serverInput, false), true);
+                    isIdle = false;
                 }
                 if (clientInput.available() > 0) {
                     write(serverOutput, read(clientInput, true), false);
+                    isIdle = false;
+                }
+                if (isIdle) {
+                    idleCount++;
+                    if (idleCount > 5 && !isConnected()) { // 空转超过5次，就通过心跳判断socket的连通性
+                        break;
+                    } else if (idleCount > 5) {
+                        idleCount = 0;
+                    }
                 }
                 Thread.sleep(1000); // 休息一下
             }
@@ -87,7 +99,7 @@ public class SyncProxyRequestHandler implements Runnable{
         } finally {
             try {
                 if (this.socketClient != null) {
-                    log.info("close socketClient=[{}], socketServer=[{}]", socketClient.getRemoteSocketAddress());
+                    log.info("close socketClient=[{}]", socketClient.getRemoteSocketAddress());
                     this.socketClient.close();
                 }
                 if (this.socketServer != null) {
@@ -161,9 +173,9 @@ public class SyncProxyRequestHandler implements Runnable{
             byteArrayOutputStream.write(Arrays.copyOf(buffer, size));
         } while (inputStream.available() > 0); // 说明还有数据可以读。非阻塞方法
         if (printFlag) {
-            log.info("[client->proxy] " + new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8));
+            print(new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8), true, true);
         } else {
-            log.info("[server->proxy] " + new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8));
+            print(new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8), true, false);
         }
         return byteArrayOutputStream.toByteArray();
     }
@@ -174,12 +186,51 @@ public class SyncProxyRequestHandler implements Runnable{
         }
 
         if (printFlag) {
-            log.info("[proxy->client] " + new String(msg, StandardCharsets.UTF_8));
+            print(new String(msg, StandardCharsets.UTF_8), false,true);
         } else {
-            log.info("[proxy->server] " + new String(msg, StandardCharsets.UTF_8));
+            print(new String(msg, StandardCharsets.UTF_8), false, false);
         }
 
         writer.write(msg);
         writer.flush();
+    }
+
+    /**
+     * 格式化打印
+     */
+    private void print(String msg, boolean isInput, boolean isClient) {
+        if (isClient) {
+            if (isInput) {
+                log.info("[client[{}]->proxy] {}", this.socketClient.getRemoteSocketAddress(), msg);
+            } else {
+                log.info("[proxy->client[{}]] {}", this.socketClient.getRemoteSocketAddress(), msg);
+            }
+        } else {
+            if (isInput) {
+                log.info("[server[{}]->proxy] {}", this.socketServer.getRemoteSocketAddress(), msg);
+            } else {
+                log.info("[proxy->server[{}]] {}", this.socketServer.getRemoteSocketAddress(), msg);
+            }
+        }
+    }
+
+    /**
+     * 判断socket已经关闭
+     * <p>
+     *     原生的socket.isClose()、isConnect() 只能判断己端是否关闭连接，如果对端关闭了连接，这两个函数是感知不到的。
+     *     所以这里写了一个函数，通过主动发送数据（类似于心跳）来判断socket是否已经关闭
+     * </p>
+     * @return
+     */
+    private boolean isConnected() {
+        try {
+            this.socketClient.getOutputStream().write(0xFF);
+            read(this.socketClient.getInputStream(), true);
+            this.socketServer.getOutputStream().write(0xFF);
+            read(this.socketServer.getInputStream(), true);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
