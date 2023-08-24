@@ -1,4 +1,5 @@
-import lombok.SneakyThrows;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.Socket;
@@ -34,10 +35,10 @@ public class SyncProxyRequestHandler implements Runnable{
         this.socketClient = socket;
     }
 
+    private static final Logger log = LoggerFactory.getLogger(SyncProxyRequestHandler.class);
     private static final List<String> HTTP_METHODS = Arrays.asList("GET", "POST", "PUT", "HEAD", "DELETE");
     private static final List<String> HTTPS_METHODS = Arrays.asList("CONNECT");
 
-    @SneakyThrows
     @Override
     public void run() {
         try {
@@ -56,7 +57,7 @@ public class SyncProxyRequestHandler implements Runnable{
 
             // step2 建立与目标服务器的连接
             socketServer = new Socket(httpRequest.getServerHost(), httpRequest.getServerPort());
-            System.out.println("success connect server [" + socketServer.getRemoteSocketAddress() + "]");
+            log.info("success connect server [" + socketServer.getRemoteSocketAddress() + "]");
             InputStream serverInput = new BufferedInputStream(socketServer.getInputStream());
             OutputStream serverOutput = new BufferedOutputStream(socketServer.getOutputStream());
 
@@ -81,11 +82,21 @@ public class SyncProxyRequestHandler implements Runnable{
                 }
                 Thread.sleep(1000); // 休息一下
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            log.error("handle socket=[{}] failed, e=", socketClient.getRemoteSocketAddress(), e);
         } finally {
-            this.socketClient.close();
-            this.socketServer.close();
+            try {
+                if (this.socketClient != null) {
+                    log.info("close socketClient=[{}], socketServer=[{}]", socketClient.getRemoteSocketAddress());
+                    this.socketClient.close();
+                }
+                if (this.socketServer != null) {
+                    log.info("close socketServer=[{}]", socketServer.getRemoteSocketAddress());
+                    this.socketServer.close();
+                }
+            } catch (Exception e) {
+                log.error("close socket failed, e=", e);
+            }
         }
     }
 
@@ -133,7 +144,7 @@ public class SyncProxyRequestHandler implements Runnable{
 
             return httpRequest;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("splitRequest failed, e=", e);
             throw e;
         }
     }
@@ -150,9 +161,9 @@ public class SyncProxyRequestHandler implements Runnable{
             byteArrayOutputStream.write(Arrays.copyOf(buffer, size));
         } while (inputStream.available() > 0); // 说明还有数据可以读。非阻塞方法
         if (printFlag) {
-            System.out.println("[client->proxy] " + new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8));
+            log.info("[client->proxy] " + new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8));
         } else {
-            System.out.println("[server->proxy] " + new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8));
+            log.info("[server->proxy] " + new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8));
         }
         return byteArrayOutputStream.toByteArray();
     }
@@ -163,9 +174,9 @@ public class SyncProxyRequestHandler implements Runnable{
         }
 
         if (printFlag) {
-            System.out.println("[proxy->client] " + new String(msg, StandardCharsets.UTF_8));
+            log.info("[proxy->client] " + new String(msg, StandardCharsets.UTF_8));
         } else {
-            System.out.println("[proxy->server] " + new String(msg, StandardCharsets.UTF_8));
+            log.info("[proxy->server] " + new String(msg, StandardCharsets.UTF_8));
         }
 
         writer.write(msg);
