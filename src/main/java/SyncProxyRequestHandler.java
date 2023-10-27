@@ -57,6 +57,7 @@ public class SyncProxyRequestHandler implements Runnable{
 
             // step2 建立与目标服务器的连接
             socketServer = new Socket(httpRequest.getServerHost(), httpRequest.getServerPort());
+            socketServer.setSoTimeout(5000);
             log.info("success connect server [" + socketServer.getRemoteSocketAddress() + "]");
             InputStream serverInput = new BufferedInputStream(socketServer.getInputStream());
             OutputStream serverOutput = new BufferedOutputStream(socketServer.getOutputStream());

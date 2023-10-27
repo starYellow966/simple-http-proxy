@@ -8,7 +8,9 @@
 ```shell
 git clone <本项目>
 mvn package
-java -jar simple-http-proxy-1.0.0-jar-with-dependencies.jar <端口号>
+java -jar simple-http-proxy-1.0.0-jar-with-dependencies.jar <端口号> <并发数>
 ```
+
+其中，端口号必填，并发数选填（默认值是5）
 
 # 原理
